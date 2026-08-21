@@ -952,71 +952,51 @@
 })();
 
 /* ---- 31-contact-main.html ---- */
-/* ── UNWIRED-FORM GUARD ───────────────────────────────────────────────────────
-   The single worst way this build can fail is the contact page going live with
-   the form still pointing at action="#". It looks completely finished, a
-   prospective client types out their situation, presses Send, and the page just
-   scrolls to the top. Nothing is stored, nobody is notified, and NOBODY EVER
-   FINDS OUT. For a firm whose average client is ~$2M, one silently swallowed
-   enquiry costs more than this entire project.
-
-   So: if the form has no real endpoint, this refuses the submit and says so, in
-   the visitor's own terms, with the phone number and email address right there.
-   A visible "call us instead" is a bad outcome. A silent no-op is a much worse
-   one, and it is the one that happens by default.
-
-   This does NOTHING once the form is wired: give the <form> a real action and
-   the guard returns immediately at load. Replacing the whole form with a native
-   Squarespace Form Block (the recommended route) removes [data-mwa-form] from
-   the page entirely, so it also returns immediately. It cannot get in the way of
-   a working form.
-   ────────────────────────────────────────────────────────────────────────── */
 (function () {
   "use strict";
 
-  /* A <script> in a Code Block is a SIBLING of the section, not a child, so
-     currentScript.closest() returns null. Query the parent, then the document. */
-  var cs = null;
-  var root = (cs && cs.parentNode && cs.parentNode.querySelector
-      ? cs.parentNode.querySelector(".mwa-contact") : null)
-    || document.querySelector(".mwa-contact");
-  if (!root) return;
+  /* ── WHY THIS SCRIPT EXISTS ──────────────────────────────────────────────
+     A Squarespace Form Block cannot be placed INSIDE a Code Block. The whole
+     contact page is one Code Block, so a Form Block added in the editor lands
+     as a sibling AFTER it — which puts the form below the site footer, outside
+     the card it is supposed to sit in.
 
-  var form  = root.querySelector("[data-mwa-form]");
-  var guard = root.querySelector("[data-mwa-form-guard]");
-  if (!form || !guard) return;
+     Splitting the page into two Code Blocks with the form between them was the
+     obvious alternative and it is worse: the form card is a single grid
+     container, so splitting it mid-element leaves each half with unbalanced
+     markup that Squarespace auto-closes, and the layout breaks in a way that is
+     tedious to debug.
 
-  /* What counts as "not wired": no action, an empty action, "#", or a bare
-     fragment. Anything else, including a relative path, is treated as real and
-     this script stands down. */
-  var action = (form.getAttribute("action") || "").trim();
-  if (action && action.charAt(0) !== "#") return;
+     So the block stays where the editor puts it and this moves it into the slot
+     on load. One DOM move, no layout thrash, no styling duplicated.
 
-  guard.innerHTML =
-    '<strong>This form isn&rsquo;t accepting messages yet.</strong> ' +
-    'Sorry &mdash; please reach us directly and we&rsquo;ll come straight back to you: ' +
-    '<a href="tel:+14105688548">(410)&nbsp;568-8548</a> or ' +
-    '<a href="mailto:andrew@metawealthadvisory.com">andrew@metawealthadvisory.com</a>.';
+     ⚠️ Deliberately tolerant: if no Form Block exists yet, the slot is
+     :empty and hides itself, so the page looks intentional rather than broken
+     while the form is still being set up. */
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    guard.hidden = false;
-    /* tabindex -1 so focus can land here without adding a tab stop. role="alert"
-       is already on the element, so it is announced as well as focused. */
-    guard.setAttribute("tabindex", "-1");
-    guard.focus();
-    guard.scrollIntoView({ block: "nearest" });
-  });
+  function place() {
+    var slot = document.querySelector("[data-mwa-form-slot]");
+    if (!slot || slot.children.length) return true;
 
-  /* Loud in the console for whoever is doing the paste, silent for visitors. */
-  if (window.console && console.warn) {
-    console.warn(
-      "[MWA] Contact form has no endpoint (action=\"" + action + "\"). " +
-      "Submissions are BLOCKED so none are silently lost. " +
-      "Fix: replace the <form> with a Squarespace Form Block (recommended, and " +
-      "required for the instant-lead-alert SMS Zap), or set a real action URL. " +
-      "See the header comment in 31-contact-main.html."
-    );
+    /* The Form Block's own wrapper, not the <form> — moving the wrapper keeps
+       Squarespace's own scripts bound to the markup they expect. */
+    var block = document.querySelector(".sqs-block-form");
+    if (!block) return false;
+
+    /* Never steal a block that is already inside the slot, and never move one
+       that sits inside the header or footer. */
+    if (slot.contains(block)) return true;
+
+    slot.appendChild(block);
+    return true;
+  }
+
+  if (!place()) {
+    /* Squarespace hydrates some blocks after DOMContentLoaded. Watch briefly
+       rather than polling forever. */
+    var obs = new MutationObserver(function () { if (place()) obs.disconnect(); });
+    obs.observe(document.body, { childList: true, subtree: true });
+    setTimeout(function () { obs.disconnect(); }, 8000);
   }
 })();
 
