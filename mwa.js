@@ -501,7 +501,7 @@
 
        That was survivable while ONE mid-page h2 on the home page used this
        effect. It is not survivable now that the H1 of /services, /about,
-       /contact and /blog all do: the failure mode is a page whose headline
+       /contact and /resources all do: the failure mode is a page whose headline
        never renders. Anything still un-animated after the timeout gets shown,
        full stop. The worst case is a heading that appeared without its
        animation, which nobody will ever notice. */
@@ -1003,9 +1003,11 @@
 /* ---- 41-resources-grid.html ---- */
 (function () {
   "use strict";
-  /* Show the empty state only when there are genuinely no article cards. Once
-     the sample cards are deleted (or a Squarespace blog list renders nothing),
-     the page still reads as finished instead of blank. */
+  /* Show the empty state only when there are genuinely no articles: none of our
+     own cards AND none in a native Squarespace post list on the same page. When
+     the native list carries the articles and our grid is empty (the blog-page
+     arrangement, see 43-resources-blog-list.html), the whole shell section is
+     hidden so it leaves no blank band between the hero and the list. */
   var cs = null;
   var root = (cs && cs.parentNode && cs.parentNode.querySelector
       ? cs.parentNode.querySelector(".mwa-res") : null)
@@ -1016,12 +1018,16 @@
   var empty = root.querySelector("[data-mwa-res-empty]");
   if (!empty) return;
 
-  var count = grid ? grid.querySelectorAll(".mwa-res__item").length : 0;
-  // Also count a native Squarespace blog list if one is on the page.
-  count += document.querySelectorAll(".blog-basic-grid article, .blog-masonry article").length;
+  var own = grid ? grid.querySelectorAll(".mwa-res__item").length : 0;
+  var native = document.querySelectorAll(
+    ".blog-basic-grid article, .blog-masonry article, " +
+    ".blog-alternating-side-by-side article, .blog-single-column article, " +
+    ".blog-list article").length;
 
-  if (count === 0) {
+  if (own === 0 && native === 0) {
     empty.hidden = false;
     if (grid) grid.hidden = true;
+  } else if (own === 0) {
+    root.hidden = true;
   }
 })();
